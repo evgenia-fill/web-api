@@ -9,29 +9,49 @@ namespace WebApi.MinimalApi.Controllers;
 [ApiController]
 public class UsersController : Controller
 {
-    private readonly IUserRepository userRepository;
-    private readonly IMapper mapper;
-    // Чтобы ASP.NET положил что-то в userRepository требуется конфигурация
+    private readonly IUserRepository _userRepository;
+    private readonly IMapper _mapper;
+
     public UsersController(IUserRepository userRepository, IMapper mapper)
     {
-        this.userRepository = userRepository;
-        this.mapper = mapper;
+        _userRepository = userRepository;
+        _mapper = mapper;
     }
 
-    [HttpGet("{userId}")]
+    [HttpGet("{userId:guid}", Name = nameof(GetUserById))]
     [Produces("application/json", "application/xml")]
     public ActionResult<UserDto> GetUserById([FromRoute] Guid userId)
     {
-        var user = userRepository.FindById(userId);
+        var user = _userRepository.FindById(userId);
         if (user == null)
             return NotFound();
-        var userDto = mapper.Map<UserDto>(user);
+        var userDto = _mapper.Map<UserDto>(user);
         return Ok(userDto);
     }
 
     [HttpPost]
-    public IActionResult CreateUser([FromBody] object user)
+    [Produces("application/json", "application/xml")]
+    public IActionResult CreateUser([FromBody] CreateUserDto dto)
     {
-        throw new NotImplementedException();
+        if (dto.Login != null && !dto.Login.All(char.IsLetterOrDigit))
+        {
+            ModelState.AddModelError(
+                "Login",
+                "Login must consist of letters or digits");
+        }
+
+        if (!ModelState.IsValid)
+        {
+            return UnprocessableEntity(ModelState);
+        }
+
+        var user = _mapper.Map<UserEntity>(dto);
+
+        _userRepository.Insert(user);
+
+        return CreatedAtRoute(
+            nameof(GetUserById),
+            new { userId = user.Id },
+            user.Id);
     }
 }
