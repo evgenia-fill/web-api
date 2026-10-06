@@ -55,14 +55,35 @@ public class UsersController : Controller
             createdUser.Id);
     }
 
-    [HttpDelete("{userId:guid}")]
-    public IActionResult DeleteUser([FromRoute] Guid userId)
+    [HttpPut("{userId}")]
+    public IActionResult UpdateUser([FromRoute] string userId, [FromBody] UpdateUserDto dto)
     {
-        var user = _userRepository.FindById(userId);
-        if (user == null)
-            return NotFound();
+        if (!Guid.TryParse(userId, out var id) || dto == null)
+            return BadRequest();
+        
+        var user = _userRepository.FindById(id);
 
-        _userRepository.Delete(userId);
+        if (!ModelState.IsValid)
+        {
+            return UnprocessableEntity(ModelState);
+        }
+
+        if (user == null)
+        {
+            user = _mapper.Map(dto, new UserEntity(id));
+        }
+        else
+        {
+            _mapper.Map(dto, user);
+        }
+
+        _userRepository.UpdateOrInsert(user, out var isInserted);
+        if (isInserted)
+            return CreatedAtRoute(
+                nameof(GetUserById),
+                new { userId },
+                id
+            );
         return NoContent();
     }
 }
