@@ -47,11 +47,22 @@ public class UsersController : Controller
 
         var user = _mapper.Map<UserEntity>(dto);
 
-        _userRepository.Insert(user);
+        var createdUser = _userRepository.Insert(user);
 
         return CreatedAtRoute(
             nameof(GetUserById),
-            new { userId = user.Id },
-            user.Id);
+            new { userId = createdUser.Id },
+            createdUser.Id);
+    }
+
+    [HttpDelete("{userId:guid}")]
+    public IActionResult DeleteUser([FromRoute] Guid userId)
+    {
+        var user = _userRepository.FindById(userId);
+        if (user == null)
+            return NotFound();
+
+        _userRepository.Delete(userId);
+        return NoContent();
     }
 }
