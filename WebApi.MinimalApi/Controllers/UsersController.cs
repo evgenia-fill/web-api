@@ -1,4 +1,5 @@
 ﻿using AutoMapper;
+using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
 using WebApi.MinimalApi.Domain;
 using WebApi.MinimalApi.Models;
@@ -84,6 +85,31 @@ public class UsersController : Controller
                 new { userId },
                 id
             );
+        return NoContent();
+    }
+    
+    [HttpPatch]
+    public IActionResult PartiallyUpdateUser([FromRoute] string userId, [FromBody] JsonPatchDocument<UpdateUserDto> patchDoc, [FromBody] UpdateUserDto dto)
+    {
+        if (!Guid.TryParse(userId, out var id) || dto == null)
+            return BadRequest();
+        var user = _userRepository.FindById(id);
+        if (!ModelState.IsValid)
+        {
+            return UnprocessableEntity(ModelState);
+        }
+        patchDoc.ApplyTo(dto, ModelState);
+        TryValidateModel(user);
+    }
+    
+    [HttpDelete("{userId:guid}")]
+    public IActionResult DeleteUser([FromRoute] Guid userId)
+    {
+        var user = _userRepository.FindById(userId);
+        if (user == null)
+            return NotFound();
+
+        _userRepository.Delete(userId);
         return NoContent();
     }
 }
