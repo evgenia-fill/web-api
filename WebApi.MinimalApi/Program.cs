@@ -55,6 +55,7 @@ builder.Services.AddAutoMapper(cfg =>
             null
         ));
     cfg.CreateMap<UpdateUserDto, UserEntity>();
+    cfg.CreateMap<UserEntity, UpdateUserDto>();
 }, new System.Reflection.Assembly[0]);
 
 var app = builder.Build();

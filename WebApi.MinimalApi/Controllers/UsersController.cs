@@ -32,7 +32,7 @@ public class UsersController : Controller
 
     [HttpPost]
     [Produces("application/json", "application/xml")]
-    public IActionResult CreateUser([FromBody] CreateUserDto dto)
+    public IActionResult CreateUser([Microsoft.AspNetCore.Mvc.FromBody] CreateUserDto dto)
     {
         if (dto.Login != null && !dto.Login.All(char.IsLetterOrDigit))
         {
@@ -57,11 +57,11 @@ public class UsersController : Controller
     }
 
     [HttpPut("{userId}")]
-    public IActionResult UpdateUser([FromRoute] string userId, [FromBody] UpdateUserDto dto)
+    public IActionResult UpdateUser([FromRoute] string userId, [Microsoft.AspNetCore.Mvc.FromBody] UpdateUserDto dto)
     {
         if (!Guid.TryParse(userId, out var id) || dto == null)
             return BadRequest();
-        
+
         var user = _userRepository.FindById(id);
 
         if (!ModelState.IsValid)
@@ -87,21 +87,41 @@ public class UsersController : Controller
             );
         return NoContent();
     }
-    
-    [HttpPatch]
-    public IActionResult PartiallyUpdateUser([FromRoute] string userId, [FromBody] JsonPatchDocument<UpdateUserDto> patchDoc, [FromBody] UpdateUserDto dto)
+
+    [HttpPatch("{userId}")]
+    public IActionResult PartiallyUpdateUser([FromRoute] string userId, [Microsoft.AspNetCore.Mvc.FromBody] JsonPatchDocument<UpdateUserDto> patchDoc)
     {
-        if (!Guid.TryParse(userId, out var id) || dto == null)
+        if (!Guid.TryParse(userId, out var id))
+            return NotFound();
+        
+        if (patchDoc == null)
             return BadRequest();
+        
         var user = _userRepository.FindById(id);
+        if (user == null)
+        {
+            return NotFound();
+        }
+
+        var dto = _mapper.Map<UpdateUserDto>(user);
+
+        patchDoc.ApplyTo(dto, ModelState);
+
         if (!ModelState.IsValid)
         {
             return UnprocessableEntity(ModelState);
         }
-        patchDoc.ApplyTo(dto, ModelState);
-        TryValidateModel(user);
+
+        if (!TryValidateModel(dto))
+        {
+            return UnprocessableEntity(ModelState);
+        }
+
+        _mapper.Map(dto, user);
+        _userRepository.Update(user);
+        return NoContent();
     }
-    
+
     [HttpDelete("{userId:guid}")]
     public IActionResult DeleteUser([FromRoute] Guid userId)
     {
