@@ -20,6 +20,7 @@ public class UsersController : Controller
     }
 
     [HttpGet("{userId:guid}", Name = nameof(GetUserById))]
+    [HttpHead("{userId:guid}")]
     [Produces("application/json", "application/xml")]
     public ActionResult<UserDto> GetUserById([FromRoute] Guid userId)
     {
@@ -27,12 +28,18 @@ public class UsersController : Controller
         if (user == null)
             return NotFound();
         var userDto = _mapper.Map<UserDto>(user);
+        if (HttpMethods.IsHead(Request.Method))
+        {
+            Response.ContentType = "application/json; charset=utf-8";
+            return Ok();
+        }
+
         return Ok(userDto);
     }
 
     [HttpPost]
     [Produces("application/json", "application/xml")]
-    public IActionResult CreateUser([Microsoft.AspNetCore.Mvc.FromBody] CreateUserDto dto)
+    public IActionResult CreateUser([FromBody] CreateUserDto dto)
     {
         if (dto.Login != null && !dto.Login.All(char.IsLetterOrDigit))
         {
@@ -132,4 +139,5 @@ public class UsersController : Controller
         _userRepository.Delete(userId);
         return NoContent();
     }
+    
 }
