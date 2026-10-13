@@ -1,6 +1,7 @@
 ﻿using AutoMapper;
 using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
+using Newtonsoft.Json;
 using WebApi.MinimalApi.Domain;
 using WebApi.MinimalApi.Models;
 
@@ -10,13 +11,15 @@ namespace WebApi.MinimalApi.Controllers;
 [ApiController]
 public class UsersController : Controller
 {
-    private readonly IUserRepository _userRepository;
-    private readonly IMapper _mapper;
+    private readonly IUserRepository userRepository;
+    private readonly IMapper mapper;
+    private readonly LinkGenerator linkGenerator;
 
-    public UsersController(IUserRepository userRepository, IMapper mapper)
+    public UsersController(IUserRepository userRepository, IMapper mapper, LinkGenerator linkGenerator)
     {
-        _userRepository = userRepository;
-        _mapper = mapper;
+        this.userRepository = userRepository;
+        this.mapper = mapper;
+        this.linkGenerator = linkGenerator;
     }
 
     [HttpGet("{userId:guid}", Name = nameof(GetUserById))]
@@ -24,10 +27,10 @@ public class UsersController : Controller
     [Produces("application/json", "application/xml")]
     public ActionResult<UserDto> GetUserById([FromRoute] Guid userId)
     {
-        var user = _userRepository.FindById(userId);
+        var user = userRepository.FindById(userId);
         if (user == null)
             return NotFound();
-        var userDto = _mapper.Map<UserDto>(user);
+        var userDto = mapper.Map<UserDto>(user);
         if (HttpMethods.IsHead(Request.Method))
         {
             Response.ContentType = "application/json; charset=utf-8";
@@ -35,6 +38,41 @@ public class UsersController : Controller
         }
 
         return Ok(userDto);
+    }
+
+    [HttpGet(Name = "GetUsers")]
+    public ActionResult<IEnumerable<UserDto>> GetUsers([FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 10)
+    {
+        if (pageNumber < 1)
+        {
+            pageNumber = Math.Max(1, pageNumber);
+        }
+
+        if (pageSize is < 1 or > 20)
+        {
+            pageSize = Math.Clamp(pageSize, 1, 20);
+        }
+
+        var pageList = userRepository.GetPage(pageNumber, pageSize);
+
+        var paginationHeader = new
+        {
+            previousPageLink = pageNumber == 1
+                ? null
+                : linkGenerator.GetUriByRouteValues(HttpContext, "GetUsers", new { pageNumber = pageNumber - 1, pageSize }),
+            nextPageLink = pageList.CurrentPage >= pageList.TotalPages
+                ? null
+                : linkGenerator.GetUriByRouteValues(HttpContext, "GetUsers", new { pageNumber = pageNumber + 1, pageSize }),
+            totalCount = pageList.TotalCount,
+            pageSize = pageList.PageSize,
+            currentPage = pageList.CurrentPage,
+            totalPages = pageList.TotalPages,
+        };
+
+        Response.Headers.Add("X-Pagination", JsonConvert.SerializeObject(paginationHeader));
+
+        var users = mapper.Map<IEnumerable<UserDto>>(pageList);
+        return Ok(users);
     }
 
     [HttpPost]
@@ -53,9 +91,9 @@ public class UsersController : Controller
             return UnprocessableEntity(ModelState);
         }
 
-        var user = _mapper.Map<UserEntity>(dto);
+        var user = mapper.Map<UserEntity>(dto);
 
-        var createdUser = _userRepository.Insert(user);
+        var createdUser = userRepository.Insert(user);
 
         return CreatedAtRoute(
             nameof(GetUserById),
@@ -69,7 +107,7 @@ public class UsersController : Controller
         if (!Guid.TryParse(userId, out var id) || dto == null)
             return BadRequest();
 
-        var user = _userRepository.FindById(id);
+        var user = userRepository.FindById(id);
 
         if (!ModelState.IsValid)
         {
@@ -78,14 +116,14 @@ public class UsersController : Controller
 
         if (user == null)
         {
-            user = _mapper.Map(dto, new UserEntity(id));
+            user = mapper.Map(dto, new UserEntity(id));
         }
         else
         {
-            _mapper.Map(dto, user);
+            mapper.Map(dto, user);
         }
 
-        _userRepository.UpdateOrInsert(user, out var isInserted);
+        userRepository.UpdateOrInsert(user, out var isInserted);
         if (isInserted)
             return CreatedAtRoute(
                 nameof(GetUserById),
@@ -100,17 +138,17 @@ public class UsersController : Controller
     {
         if (!Guid.TryParse(userId, out var id))
             return NotFound();
-        
+
         if (patchDoc == null)
             return BadRequest();
-        
-        var user = _userRepository.FindById(id);
+
+        var user = userRepository.FindById(id);
         if (user == null)
         {
             return NotFound();
         }
 
-        var dto = _mapper.Map<UpdateUserDto>(user);
+        var dto = mapper.Map<UpdateUserDto>(user);
 
         patchDoc.ApplyTo(dto, ModelState);
 
@@ -124,19 +162,19 @@ public class UsersController : Controller
             return UnprocessableEntity(ModelState);
         }
 
-        _mapper.Map(dto, user);
-        _userRepository.Update(user);
+        mapper.Map(dto, user);
+        userRepository.Update(user);
         return NoContent();
     }
 
     [HttpDelete("{userId:guid}")]
     public IActionResult DeleteUser([FromRoute] Guid userId)
     {
-        var user = _userRepository.FindById(userId);
+        var user = userRepository.FindById(userId);
         if (user == null)
             return NotFound();
 
-        _userRepository.Delete(userId);
+        userRepository.Delete(userId);
         return NoContent();
     }
 
