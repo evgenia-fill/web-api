@@ -32,7 +32,7 @@ public class UsersController : Controller
 
     [HttpPost]
     [Produces("application/json", "application/xml")]
-    public IActionResult CreateUser([Microsoft.AspNetCore.Mvc.FromBody] CreateUserDto dto)
+    public IActionResult CreateUser([FromBody] CreateUserDto dto)
     {
         if (dto.Login != null && !dto.Login.All(char.IsLetterOrDigit))
         {
@@ -57,7 +57,7 @@ public class UsersController : Controller
     }
 
     [HttpPut("{userId}")]
-    public IActionResult UpdateUser([FromRoute] string userId, [Microsoft.AspNetCore.Mvc.FromBody] UpdateUserDto dto)
+    public IActionResult UpdateUser([FromRoute] string userId, [FromBody] UpdateUserDto dto)
     {
         if (!Guid.TryParse(userId, out var id) || dto == null)
             return BadRequest();
@@ -89,7 +89,7 @@ public class UsersController : Controller
     }
 
     [HttpPatch("{userId}")]
-    public IActionResult PartiallyUpdateUser([FromRoute] string userId, [Microsoft.AspNetCore.Mvc.FromBody] JsonPatchDocument<UpdateUserDto> patchDoc)
+    public IActionResult PartiallyUpdateUser([FromRoute] string userId, [FromBody] JsonPatchDocument<UpdateUserDto> patchDoc)
     {
         if (!Guid.TryParse(userId, out var id))
             return NotFound();
